@@ -18,10 +18,10 @@
           },
           colors: {
             app: {
-              base: '#1a1d28',        /* Світліший глибокий графіт замість смоляно-чорного */
-              card: '#222738',        /* М'які платиново-сині панелі */
+              base: '#1a1d28',
+              card: '#222738',
               cardBorder: 'rgba(255, 255, 255, 0.08)',
-              subtle: '#2a3147',      /* Інпути та внутрішні бейджі */
+              subtle: '#2a3147',
               accent: '#6366f1',
               accentLight: '#818cf8',
             }
@@ -41,7 +41,7 @@
     ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
   </style>
 
-  <!-- Firebase -->
+  <!-- Firebase Підключення -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -59,7 +59,8 @@
     let state = {
       links: [],
       quickPad: "",
-      notesList: []
+      notesList: [],
+      wsTasks: []
     };
 
     try {
@@ -79,17 +80,20 @@
             ],
             quickPad: "",
             notesList: [
-              { id: 1, text: "Здати щотижневий звіт Stories" },
-              { id: 2, text: "Перевірити банери для таргетингу" }
+              { id: 1, text: "Підготувати контент-план на тиждень" }
+            ],
+            wsTasks: [
+              { id: 1, text: "Перевірити задачі у Worksection", done: false }
             ]
           };
           saveCloud();
         }
         renderLinks();
         renderNotesList();
+        renderWsTasks();
         
         const pad = document.getElementById('scratchpad');
-        if (document.activeElement !== pad) {
+        if (pad && document.activeElement !== pad) {
           pad.value = state.quickPad || "";
         }
         setCloudStatus(true);
@@ -127,7 +131,7 @@
       }
     }
 
-    // Рендер посилань (компактні картки)
+    // 1. РЕНДЕР ПОСИЛАНЬ
     window.renderLinks = function() {
       const list = document.getElementById('links-list');
       if (!list) return;
@@ -147,8 +151,8 @@
         }
 
         card.innerHTML = `
-          <div class="flex items-center gap-2.5 min-w-0 pr-2">
-            <div class="w-7 h-7 rounded-lg bg-black/20 border border-white/5 flex items-center justify-center">
+          <div class="flex items-center gap-2 min-w-0 pr-1.5">
+            <div class="w-7 h-7 rounded-lg bg-black/20 border border-white/5 flex items-center justify-center shrink-0">
               ${iconSvg}
             </div>
             <div class="min-w-0">
@@ -182,7 +186,7 @@
       saveCloud();
     };
 
-    // Великий блокнот (Scratchpad)
+    // 2. ВЕЛИКИЙ БЛОКНОТ (SCRATCHPAD)
     let padDebounce;
     window.onPadInput = function(val) {
       state.quickPad = val;
@@ -190,7 +194,7 @@
       padDebounce = setTimeout(() => { saveCloud(); }, 400);
     };
 
-    // Список нотаток
+    // 3. ОКРЕМІ ШВИДКІ НОТАТКИ
     window.renderNotesList = function() {
       const c = document.getElementById('notes-list-container');
       if (!c) return;
@@ -221,8 +225,61 @@
     };
 
     window.deleteNoteItem = function(id) {
-      state.notesList = state.notesList.filter(i => i.id !== id);
+      state.notesList = (state.notesList || []).filter(i => i.id !== id);
       renderNotesList();
+      saveCloud();
+    };
+
+    // 4. WORKSECTION ТАСКИ
+    window.renderWsTasks = function() {
+      const container = document.getElementById('ws-tasks-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!state.wsTasks || state.wsTasks.length === 0) {
+        container.innerHTML = `<div class="p-3 text-[11px] text-zinc-500 text-center">Задач на сьогодні немає ✨</div>`;
+        return;
+      }
+
+      state.wsTasks.forEach(t => {
+        const item = document.createElement('div');
+        item.className = "group flex items-center justify-between gap-2 p-2 rounded-lg bg-app-base/70 hover:bg-app-base border border-app-cardBorder text-xs text-zinc-200 transition";
+        item.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0 flex-1 cursor-pointer" onclick="toggleWsTask(${t.id})">
+            <span class="w-3.5 h-3.5 rounded flex items-center justify-center border ${t.done ? 'bg-emerald-500 border-emerald-500 text-black font-bold' : 'border-zinc-500'} text-[10px] shrink-0">
+              ${t.done ? '✓' : ''}
+            </span>
+            <span class="truncate ${t.done ? 'line-through text-zinc-500' : 'text-zinc-200'}">${t.text}</span>
+          </div>
+          <button onclick="deleteWsTask(${t.id})" class="text-zinc-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition px-1">✕</button>
+        `;
+        container.appendChild(item);
+      });
+    };
+
+    window.addWsTask = function() {
+      const input = document.getElementById('ws-custom-input');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!state.wsTasks) state.wsTasks = [];
+      state.wsTasks.unshift({ id: Date.now(), text: val, done: false });
+      input.value = '';
+      renderWsTasks();
+      saveCloud();
+    };
+
+    window.toggleWsTask = function(id) {
+      const t = (state.wsTasks || []).find(i => i.id === id);
+      if (t) {
+        t.done = !t.done;
+        renderWsTasks();
+        saveCloud();
+      }
+    };
+
+    window.deleteWsTask = function(id) {
+      state.wsTasks = (state.wsTasks || []).filter(i => i.id !== id);
+      renderWsTasks();
       saveCloud();
     };
   </script>
@@ -230,7 +287,7 @@
 
 <body class="h-screen w-screen bg-app-base text-zinc-200 overflow-hidden flex flex-col p-4 md:p-5 gap-3.5 antialiased selection:bg-indigo-500/30 selection:text-white">
 
-  <!-- ШАПКА / HEADER (СВІТЛІШИЙ ОСТРІВЕЦЬ) -->
+  <!-- ШАПКА / HEADER -->
   <header class="w-full bg-app-card border border-app-cardBorder rounded-2xl px-5 py-3 flex items-center justify-between shrink-0 shadow-xl shadow-black/20">
     <div class="flex items-center gap-4">
       <div class="flex items-center gap-2">
@@ -241,20 +298,20 @@
       <div id="cur-date" class="text-xs text-zinc-300 capitalize font-medium"></div>
     </div>
 
-    <!-- Дії шапки -->
     <div class="flex items-center gap-3">
-      <!-- Статус хмари -->
+      <!-- Статус синхронізації -->
       <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-app-subtle border border-app-cardBorder">
         <span id="sync-dot" class="w-2 h-2 rounded-full bg-zinc-500"></span>
         <span id="sync-text" class="text-[11px] font-mono text-zinc-300">Підключення...</span>
       </div>
 
-      <!-- Кнопка відкриття Калькулятора (Pop-up) -->
+      <!-- Кнопка Калькулятора -->
       <button onclick="openModal('calc-modal')" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 font-semibold text-xs transition duration-150 active:scale-95">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
         <span>Калькулятор ERR / Stories</span>
       </button>
 
+      <!-- Додати ресурс -->
       <button onclick="openModal('link-modal')" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-bold text-xs transition duration-150 active:scale-95 shadow-sm">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
         <span>Ресурс</span>
@@ -262,10 +319,10 @@
     </div>
   </header>
 
-  <!-- ГОЛОВНИЙ ЕКРАН (1 СТОРІНКА БЕЗ СКРОЛУ) -->
+  <!-- ОСНОВНА СІТКА НА ВЕСЬ ЕКРАН БЕЗ СКРОЛУ -->
   <main class="w-full flex-1 grid grid-cols-12 gap-3.5 min-h-0">
 
-    <!-- КОЛОНКА 1: РОБОЧІ РЕСУРСИ (РОЗШИРЕНА З КОМПАКТНИМИ КАРТКАМИ) — 4 КОЛОНКИ -->
+    <!-- КОЛОНКА 1: РОБОЧІ РЕСУРСИ (4 КОЛОНКИ) -->
     <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
       <div class="flex items-center justify-between mb-2.5 shrink-0">
         <div class="flex items-center gap-2">
@@ -275,7 +332,7 @@
         <span class="text-[10px] font-mono text-zinc-400">Картки</span>
       </div>
 
-      <!-- Сітка посилань (у 2 акуратні колонки всередині блоку) -->
+      <!-- Сітка посилань у 2 колонки -->
       <div id="links-list" class="flex-1 grid grid-cols-2 gap-2 overflow-y-auto pr-1 content-start">
         <!-- Картки -->
       </div>
@@ -286,32 +343,55 @@
       </div>
     </section>
 
-    <!-- КОЛОНКА 2: WORKSECTION ДЕДЛАЙНИ (ЖИВИЙ ІНТЕГРОВАНИЙ КАЛЕНДАР) — 4 КОЛОНКИ -->
+    <!-- КОЛОНКА 2: WORKSECTION DOCK & ТАСКИ НА ДЕНЬ (4 КОЛОНКИ) -->
     <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
       <div class="flex items-center justify-between mb-2.5 shrink-0">
         <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
-          <h2 class="text-xs font-bold text-zinc-100 tracking-wider uppercase">Worksection Задачі</h2>
+          <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+          <h2 class="text-xs font-bold text-zinc-100 tracking-wider uppercase">Worksection & Задачі</h2>
         </div>
-        <button onclick="fetchWorksectionTasks()" class="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-          <span>Оновити</span> ⟳
-        </button>
+        <a href="https://vau.worksection.com" target="_blank" rel="noopener noreferrer" class="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+          vau.worksection.com ↗
+        </a>
       </div>
 
-      <!-- Контейнер задач Worksection -->
-      <div id="ws-tasks-container" class="flex-1 space-y-2 overflow-y-auto pr-1">
-        <div class="p-3 rounded-xl bg-app-subtle/50 text-xs text-zinc-400 text-center animate-pulse">
-          Завантаження задач із Worksection...
+      <!-- Швидкі кнопки до розділів Worksection -->
+      <div class="grid grid-cols-2 gap-2 mb-2.5 shrink-0">
+        <a href="https://vau.worksection.com/project/my/" target="_blank" rel="noopener noreferrer" class="p-2.5 rounded-xl bg-app-subtle/70 hover:bg-app-subtle border border-app-cardBorder flex items-center gap-2.5 text-xs text-zinc-200 transition group">
+          <span class="p-1.5 rounded-lg bg-black/20 text-rose-400">🔥</span>
+          <div class="min-w-0">
+            <span class="font-semibold block truncate group-hover:text-white">Мої задачі</span>
+            <span class="text-[10px] text-zinc-400 font-mono block truncate">Активні дедлайни</span>
+          </div>
+        </a>
+        <a href="https://vau.worksection.com/calendar/" target="_blank" rel="noopener noreferrer" class="p-2.5 rounded-xl bg-app-subtle/70 hover:bg-app-subtle border border-app-cardBorder flex items-center gap-2.5 text-xs text-zinc-200 transition group">
+          <span class="p-1.5 rounded-lg bg-black/20 text-indigo-400">📅</span>
+          <div class="min-w-0">
+            <span class="font-semibold block truncate group-hover:text-white">Календар</span>
+            <span class="text-[10px] text-zinc-400 font-mono block truncate">Сітка тижня</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Список поточних тасок -->
+      <div class="flex-1 flex flex-col min-h-0 bg-app-subtle/40 border border-app-cardBorder rounded-xl p-3 justify-between">
+        <div class="flex items-center gap-2 mb-2 shrink-0">
+          <input type="text" id="ws-custom-input" placeholder="+ Додати задачу на день..." class="flex-1 bg-app-base border border-app-cardBorder rounded-lg px-2.5 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500" onkeydown="if(event.key==='Enter') addWsTask()">
+          <button onclick="addWsTask()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition">+</button>
+        </div>
+
+        <div id="ws-tasks-container" class="flex-1 space-y-1.5 overflow-y-auto pr-1">
+          <!-- Рендериться з Firebase -->
         </div>
       </div>
 
       <div class="pt-2.5 border-t border-app-cardBorder flex items-center justify-between text-[10px] text-zinc-400 font-mono shrink-0">
-        <span>vau.worksection.com</span>
-        <span class="text-rose-400">Дедлайни</span>
+        <span>Синхронізація задач</span>
+        <span class="text-indigo-400">Task Tracker</span>
       </div>
     </section>
 
-    <!-- КОЛОНКА 3: БЛОКНОТ (SCRATCHPAD) ТА НОТАТКИ — 4 КОЛОНКИ -->
+    <!-- КОЛОНКА 3: БЛОКНОТ (SCRATCHPAD) ТА НОТАТКИ (4 КОЛОНКИ) -->
     <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
       
       <div class="flex items-center justify-between mb-2 shrink-0">
@@ -322,39 +402,39 @@
         <span class="text-[10px] font-mono text-zinc-400">Auto-save</span>
       </div>
 
-      <div class="flex-1 flex flex-col gap-3 min-h-0">
-        <!-- 1. Велике текстове поле (Word-style швидкий блокнот) -->
+      <div class="flex-1 flex flex-col gap-2.5 min-h-0">
+        <!-- Швидкий блокнот (без дефолтного тексту) -->
         <div class="h-1/2 bg-app-subtle/50 border border-app-cardBorder rounded-xl p-3 flex flex-col">
           <textarea 
             id="scratchpad" 
             oninput="onPadInput(this.value)" 
-            placeholder="Швидкий текст, копірайт, думки на сьогодні..." 
+            placeholder="Швидкий текст, чернетка, копірайт..." 
             class="w-full flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed font-sans"
           ></textarea>
         </div>
 
-        <!-- 2. Окремі списки нотаток / To-Do -->
+        <!-- Окремі списки нотаток -->
         <div class="h-1/2 bg-app-subtle/30 border border-app-cardBorder rounded-xl p-3 flex flex-col justify-between overflow-hidden">
           <div class="flex items-center gap-1.5 mb-2 shrink-0">
-            <input type="text" id="new-note-input" placeholder="+ Додати швидку нотатку..." class="flex-1 bg-app-base border border-app-cardBorder rounded-lg px-2.5 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500">
-            <button onclick="addNoteItem()" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition">+</button>
+            <input type="text" id="new-note-input" placeholder="+ Додати нотатку..." class="flex-1 bg-app-base border border-app-cardBorder rounded-lg px-2.5 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500" onkeydown="if(event.key==='Enter') addNoteItem()">
+            <button onclick="addNoteItem()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition">+</button>
           </div>
 
           <div id="notes-list-container" class="flex-1 space-y-1.5 overflow-y-auto pr-1">
-            <!-- Список стікерів-нотаток -->
+            <!-- Список нотаток -->
           </div>
         </div>
       </div>
 
       <div class="pt-2.5 border-t border-app-cardBorder flex items-center justify-between text-[10px] text-zinc-400 font-mono shrink-0">
-        <span>Хмарна синхронізація</span>
+        <span>Хмарне збереження</span>
         <span class="text-sky-400">Notes & Pad</span>
       </div>
     </section>
 
   </main>
 
-  <!-- ================= POP-UP 1: КАЛЬКУЛЯТОР ERR ТА STORIES ================= -->
+  <!-- ================= POP-UP: КАЛЬКУЛЯТОР ERR ТА STORIES ================= -->
   <div id="calc-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-app-card border border-app-cardBorder rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
       <div class="flex items-center justify-between pb-3 border-b border-app-cardBorder">
@@ -362,7 +442,7 @@
           <div class="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
           </div>
-          <h3 class="text-sm font-bold uppercase tracking-wider text-white">Калькулятор SMM (ERR & Stories)</h3>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white">Калькулятор SMM</h3>
         </div>
         <button onclick="closeModal('calc-modal')" class="text-zinc-400 hover:text-white text-lg">✕</button>
       </div>
@@ -374,7 +454,7 @@
             <span class="text-xs font-semibold text-zinc-200">ERR за охопленням</span>
             <div class="flex items-center gap-2 bg-app-base px-3 py-1 rounded-xl border border-app-cardBorder">
               <span id="pop-err-result" class="text-sm font-bold font-mono text-indigo-300">0.00%</span>
-              <button onclick="copyOnly('pop-err-result')" class="text-zinc-400 hover:text-white" title="Скопіювати число">
+              <button onclick="copyOnly('pop-err-result')" class="text-zinc-400 hover:text-white transition" title="Скопіювати число">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
               </button>
             </div>
@@ -389,7 +469,7 @@
             <span class="text-xs font-semibold text-zinc-200">Середні перегляди Stories</span>
             <div class="flex items-center gap-2 bg-app-base px-3 py-1 rounded-xl border border-app-cardBorder">
               <span id="pop-st-result" class="text-sm font-bold font-mono text-sky-300">0</span>
-              <button onclick="copyOnly('pop-st-result')" class="text-zinc-400 hover:text-white" title="Скопіювати число">
+              <button onclick="copyOnly('pop-st-result')" class="text-zinc-400 hover:text-white transition" title="Скопіювати число">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
               </button>
             </div>
@@ -404,7 +484,7 @@
     </div>
   </div>
 
-  <!-- ================= POP-UP 2: ДОДАВАННЯ РЕСУРСУ ================= -->
+  <!-- ================= POP-UP: ДОДАВАННЯ РЕСУРСУ ================= -->
   <div id="link-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-app-card border border-app-cardBorder rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between pb-3 border-b border-app-cardBorder">
@@ -421,7 +501,7 @@
           <input type="text" id="modal-cat" placeholder="Аналітика / Клієнт" class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="block text-[10px] text-zinc-400 font-mono mb-1">ТИП</label>
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">ТИП ІКОНКИ</label>
           <select id="modal-type" class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
             <option value="sheet">Таблиця (Sheets)</option>
             <option value="drive">Диск / Папка (Drive)</option>
@@ -429,8 +509,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-[10px] text-zinc-400 font-mono mb-1">URL</label>
-          <input type="url" id="modal-url" placeholder="https://..." class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">URL ПОСИЛАННЯ</label>
+          <input type="url" id="modal-url" placeholder="https://docs.google.com/..." class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
         </div>
       </div>
       <div class="flex justify-end gap-2 pt-2">
@@ -448,88 +528,14 @@
     function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
     function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-    // --- WORKSECTION LIVE CALENDAR FETCH ---
-    const WS_FEED_URL = "https://vau.worksection.com/calendar/xml/30bdfde15338d0af5c24b783698cd2fb/?v=2&role=1";
-
-    async function fetchWorksectionTasks() {
-      const container = document.getElementById('ws-tasks-container');
-      container.innerHTML = `<div class="p-3 rounded-xl bg-app-subtle/50 text-xs text-zinc-400 text-center animate-pulse">Оновлення задач...</div>`;
-
-      try {
-        // Використовуємо надійний CORS-проксі allorigins для завантаження iCal стрічки
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(WS_FEED_URL)}`;
-        const res = await fetch(proxyUrl);
-        const data = await res.text();
-        parseIcalData(data);
-      } catch (e) {
-        container.innerHTML = `
-          <div class="p-3 rounded-xl bg-app-subtle/60 border border-app-cardBorder text-xs text-zinc-300 text-center space-y-2">
-            <p>Не вдалося завантажити фід напряму через обмеження браузера.</p>
-            <a href="https://vau.worksection.com" target="_blank" class="inline-block px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold">Відкрити Worksection ↗</a>
-          </div>
-        `;
-      }
-    }
-
-    function parseIcalData(rawIcal) {
-      const container = document.getElementById('ws-tasks-container');
-      const events = [];
-      const lines = rawIcal.split(/\r?\n/);
-      let inEvent = false;
-      let cur = {};
-
-      lines.forEach(line => {
-        if (line.startsWith('BEGIN:VEVENT')) { inEvent = true; cur = {}; }
-        else if (line.startsWith('END:VEVENT')) { inEvent = false; events.push(cur); }
-        else if (inEvent) {
-          if (line.startsWith('SUMMARY:')) cur.title = line.replace('SUMMARY:', '').trim();
-          if (line.startsWith('DTSTART') || line.startsWith('DTEND')) {
-            const parts = line.split(':');
-            cur.date = parts[1] ? parts[1].trim() : '';
-          }
-          if (line.startsWith('URL:')) cur.url = line.replace('URL:', '').trim();
-        }
-      });
-
-      if (events.length === 0) {
-        container.innerHTML = `<div class="p-3 rounded-xl bg-app-subtle/40 text-xs text-zinc-400 text-center">Активних дедлайнів на найближчий час немає 🎉</div>`;
-        return;
-      }
-
-      container.innerHTML = '';
-      events.slice(0, 10).forEach(ev => {
-        let fmtDate = "Скоро";
-        if (ev.date && ev.date.length >= 8) {
-          const y = ev.date.substring(0, 4);
-          const m = ev.date.substring(4, 6);
-          const d = ev.date.substring(6, 8);
-          fmtDate = `${d}.${m}`;
-        }
-
-        const taskEl = document.createElement('div');
-        taskEl.className = "p-2.5 rounded-xl bg-app-subtle/45 hover:bg-app-subtle/80 border border-app-cardBorder flex items-center justify-between gap-3 transition";
-        taskEl.innerHTML = `
-          <div class="min-w-0 pr-1">
-            <span class="text-xs font-medium text-zinc-100 block truncate">${ev.title || 'Задача без назви'}</span>
-            <span class="text-[10px] text-zinc-400 font-mono">Дедлайн: ${fmtDate}</span>
-          </div>
-          ${ev.url ? `<a href="${ev.url}" target="_blank" class="p-1 rounded-lg text-indigo-400 hover:text-white text-[11px] font-mono">↗</a>` : ''}
-        `;
-        container.appendChild(taskEl);
-      });
-    }
-
-    // Завантажуємо задачі при запуску
-    fetchWorksectionTasks();
-
-    // --- ЛОГІКА КАЛЬКУЛЯТОРА В ПОП-АПІ ---
+    // Калькулятор логіка
     function extractNums(str) {
       if (!str) return [];
       return str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
     }
 
     function calcPopMetrics() {
-      // ERR
+      // 1. ERR
       const reachArr = extractNums(document.getElementById('pop-err-reach').value);
       const engArr = extractNums(document.getElementById('pop-err-eng').value);
       const totalReach = reachArr.reduce((a, b) => a + b, 0);
@@ -542,7 +548,7 @@
         errEl.textContent = '0.00%';
       }
 
-      // Stories
+      // 2. Stories
       const stArr = extractNums(document.getElementById('pop-st-views').value);
       const stEl = document.getElementById('pop-st-result');
       if (stArr.length > 0) {
