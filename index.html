@@ -18,14 +18,12 @@
           },
           colors: {
             app: {
-              bg: '#090b10',
-              card: '#111420',
-              inner: '#161a29',
-              border: 'rgba(255, 255, 255, 0.07)',
-              hover: 'rgba(255, 255, 255, 0.03)',
+              base: '#1a1d28',        /* Світліший глибокий графіт замість смоляно-чорного */
+              card: '#222738',        /* М'які платиново-сині панелі */
+              cardBorder: 'rgba(255, 255, 255, 0.08)',
+              subtle: '#2a3147',      /* Інпути та внутрішні бейджі */
               accent: '#6366f1',
-              accentMuted: 'rgba(99, 102, 241, 0.15)',
-              accentPurple: '#8b5cf6',
+              accentLight: '#818cf8',
             }
           }
         }
@@ -34,37 +32,16 @@
   </script>
 
   <style>
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      user-select: none;
-    }
-    input, textarea {
-      user-select: text;
-    }
-    /* Видалення стрілочок з полів */
-    input::-webkit-outer-spin-button,
-    input::-webkit-inner-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    /* Стильний тонкий скрол */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.22);
-    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; user-select: none; }
+    input, textarea { user-select: text; }
+    input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
   </style>
 
-  <!-- Firebase Підключення -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -78,74 +55,79 @@
       appId: "1:688337728430:web:436f588e1aef4bf3474e3f"
     };
 
-    let db;
     let docRef;
     let state = {
       links: [],
-      notes: ""
+      quickPad: "",
+      notesList: []
     };
 
     try {
       const app = initializeApp(firebaseConfig);
-      db = getFirestore(app);
-      docRef = doc(db, "workspace", "compact_dashboard");
+      const db = getFirestore(app);
+      docRef = doc(db, "workspace", "vau_workstation");
 
-      onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          state = docSnap.data();
+      onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          state = snap.data();
         } else {
           state = {
             links: [
               { id: 1, title: 'Таблиця звітів', category: 'Аналітика', type: 'sheet', url: 'https://sheets.google.com' },
-              { id: 2, title: 'Робочий диск', category: 'Контент', type: 'drive', url: 'https://drive.google.com' },
-              { id: 3, title: 'Сітка публікацій', category: 'План', type: 'sheet', url: 'https://sheets.google.com' }
+              { id: 2, title: 'Google Диск', category: 'Контент', type: 'drive', url: 'https://drive.google.com' },
+              { id: 3, title: 'Контент-план', category: 'Сітка', type: 'sheet', url: 'https://sheets.google.com' }
             ],
-            notes: ""
+            quickPad: "",
+            notesList: [
+              { id: 1, text: "Здати щотижневий звіт Stories" },
+              { id: 2, text: "Перевірити банери для таргетингу" }
+            ]
           };
-          saveToCloud();
+          saveCloud();
         }
         renderLinks();
-        const pad = document.getElementById('notepad-area');
+        renderNotesList();
+        
+        const pad = document.getElementById('scratchpad');
         if (document.activeElement !== pad) {
-          pad.value = state.notes || "";
+          pad.value = state.quickPad || "";
         }
         setCloudStatus(true);
       }, (err) => {
-        console.error("Firestore sync error:", err);
+        console.error(err);
         setCloudStatus(false);
       });
     } catch (e) {
-      console.error("Firebase init failed:", e);
+      console.error(e);
       setCloudStatus(false);
     }
 
-    async function saveToCloud() {
+    async function saveCloud() {
       if (!docRef) return;
       try {
         await setDoc(docRef, state);
         setCloudStatus(true);
       } catch (e) {
-        console.error("Save error:", e);
         setCloudStatus(false);
       }
     }
 
-    function setCloudStatus(isOnline) {
+    function setCloudStatus(ok) {
       const dot = document.getElementById('sync-dot');
-      const text = document.getElementById('sync-text');
-      if (!dot || !text) return;
-      if (isOnline) {
-        dot.className = "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]";
-        text.textContent = "Cloud Sync";
-        text.className = "text-[11px] font-mono text-zinc-300";
+      const txt = document.getElementById('sync-text');
+      if (!dot || !txt) return;
+      if (ok) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]";
+        txt.textContent = "Синхронізовано";
+        txt.className = "text-[11px] font-mono text-emerald-400/90";
       } else {
-        dot.className = "w-2 h-2 rounded-full bg-rose-500 animate-pulse";
-        text.textContent = "Offline / Error";
-        text.className = "text-[11px] font-mono text-rose-400";
+        dot.className = "w-2 h-2 rounded-full bg-rose-400 animate-pulse";
+        txt.textContent = "Офлайн";
+        txt.className = "text-[11px] font-mono text-rose-400";
       }
     }
 
-    // Рендер посилань
+    // Рендер посилань (компактні картки)
     window.renderLinks = function() {
       const list = document.getElementById('links-list');
       if (!list) return;
@@ -153,31 +135,30 @@
 
       (state.links || []).forEach(item => {
         const card = document.createElement('div');
-        card.className = "group relative flex items-center justify-between p-3 rounded-2xl bg-app-inner/60 hover:bg-app-inner border border-app-border hover:border-indigo-500/40 transition duration-200";
+        card.className = "group relative flex items-center justify-between p-2.5 rounded-xl bg-app-subtle/50 hover:bg-app-subtle border border-app-cardBorder hover:border-indigo-500/40 transition duration-150";
 
         let iconSvg = '';
         if (item.type === 'sheet') {
-          iconSvg = `<svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+          iconSvg = `<svg class="w-3.5 h-3.5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
         } else if (item.type === 'drive') {
-          iconSvg = `<svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`;
+          iconSvg = `<svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>`;
         } else {
-          iconSvg = `<svg class="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>`;
+          iconSvg = `<svg class="w-3.5 h-3.5 text-sky-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>`;
         }
 
         card.innerHTML = `
-          <div class="flex items-center gap-3.5 min-w-0">
-            <div class="w-9 h-9 rounded-xl bg-black/40 border border-white/5 flex items-center justify-center shrink-0">
+          <div class="flex items-center gap-2.5 min-w-0 pr-2">
+            <div class="w-7 h-7 rounded-lg bg-black/20 border border-white/5 flex items-center justify-center">
               ${iconSvg}
             </div>
             <div class="min-w-0">
-              <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-zinc-200 group-hover:text-white transition flex items-center gap-1.5 truncate">
-                ${item.title}
-                <span class="text-[10px] text-zinc-500 group-hover:text-indigo-400 transition">↗</span>
+              <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-zinc-100 hover:text-indigo-300 transition block truncate">
+                ${item.title} <span class="text-[10px] text-zinc-400">↗</span>
               </a>
-              <span class="text-[10px] text-zinc-500 font-mono block truncate mt-0.5">${item.category || 'Посилання'}</span>
+              <span class="text-[10px] text-zinc-400 block truncate font-mono">${item.category || 'Посилання'}</span>
             </div>
           </div>
-          <button onclick="deleteLink(${item.id})" class="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-white/5 transition" title="Видалити">
+          <button onclick="deleteLink(${item.id})" class="opacity-0 group-hover:opacity-100 p-1 text-zinc-400 hover:text-rose-400 transition" title="Видалити">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         `;
@@ -190,221 +171,271 @@
       const category = document.getElementById('modal-cat').value.trim();
       const type = document.getElementById('modal-type').value;
       const url = document.getElementById('modal-url').value.trim();
-
       if (!title || !url) return;
       state.links.push({ id: Date.now(), title, category, type, url });
-      saveToCloud();
-      closeModal();
+      saveCloud();
+      closeModal('link-modal');
     };
 
     window.deleteLink = function(id) {
       state.links = state.links.filter(i => i.id !== id);
-      saveToCloud();
+      saveCloud();
     };
 
-    // Збереження нотатки без затримок
-    let debounce;
-    window.onNoteChange = function(val) {
-      state.notes = val;
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        saveToCloud();
-      }, 500);
+    // Великий блокнот (Scratchpad)
+    let padDebounce;
+    window.onPadInput = function(val) {
+      state.quickPad = val;
+      clearTimeout(padDebounce);
+      padDebounce = setTimeout(() => { saveCloud(); }, 400);
+    };
+
+    // Список нотаток
+    window.renderNotesList = function() {
+      const c = document.getElementById('notes-list-container');
+      if (!c) return;
+      c.innerHTML = '';
+      (state.notesList || []).forEach(note => {
+        const item = document.createElement('div');
+        item.className = "group flex items-start justify-between gap-2 p-2 rounded-xl bg-app-subtle/40 hover:bg-app-subtle/70 border border-app-cardBorder text-xs text-zinc-200 transition";
+        item.innerHTML = `
+          <div class="flex items-start gap-2 min-w-0">
+            <span class="text-indigo-400 text-xs mt-0.5">•</span>
+            <span class="break-words leading-tight">${note.text}</span>
+          </div>
+          <button onclick="deleteNoteItem(${note.id})" class="text-zinc-500 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition shrink-0">✕</button>
+        `;
+        c.appendChild(item);
+      });
+    };
+
+    window.addNoteItem = function() {
+      const input = document.getElementById('new-note-input');
+      const val = input.value.trim();
+      if (!val) return;
+      if (!state.notesList) state.notesList = [];
+      state.notesList.unshift({ id: Date.now(), text: val });
+      input.value = '';
+      renderNotesList();
+      saveCloud();
+    };
+
+    window.deleteNoteItem = function(id) {
+      state.notesList = state.notesList.filter(i => i.id !== id);
+      renderNotesList();
+      saveCloud();
     };
   </script>
 </head>
 
-<body class="h-screen w-screen bg-app-bg text-zinc-300 overflow-hidden flex flex-col p-4 md:p-6 gap-4 antialiased selection:bg-indigo-600/40 selection:text-white">
+<body class="h-screen w-screen bg-app-base text-zinc-200 overflow-hidden flex flex-col p-4 md:p-5 gap-3.5 antialiased selection:bg-indigo-500/30 selection:text-white">
 
-  <!-- ВЕРХНІЙ БАР (ЗА РЕФЕРЕНСОМ: ПЛАВНИЙ, ЗАКРУГЛЕНИЙ ОСТРІВЕЦЬ) -->
-  <header class="w-full bg-app-card border border-app-border rounded-3xl px-6 py-3.5 flex items-center justify-between shrink-0 shadow-2xl shadow-black/50">
-    <div class="flex items-center gap-5">
+  <!-- ШАПКА / HEADER (СВІТЛІШИЙ ОСТРІВЕЦЬ) -->
+  <header class="w-full bg-app-card border border-app-cardBorder rounded-2xl px-5 py-3 flex items-center justify-between shrink-0 shadow-xl shadow-black/20">
+    <div class="flex items-center gap-4">
       <div class="flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]"></span>
-        <h1 class="text-sm font-extrabold tracking-widest text-white uppercase">WORKSPACE</h1>
+        <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.8)]"></span>
+        <h1 class="text-sm font-extrabold tracking-widest text-white uppercase">VAU. WORKSPACE</h1>
       </div>
-      <span class="text-zinc-700 font-mono text-sm">/</span>
-      <div id="cur-date" class="text-xs text-zinc-400 capitalize font-medium"></div>
+      <span class="text-zinc-500 font-mono text-xs">/</span>
+      <div id="cur-date" class="text-xs text-zinc-300 capitalize font-medium"></div>
     </div>
 
-    <!-- Права частина шапки -->
+    <!-- Дії шапки -->
     <div class="flex items-center gap-3">
-      <div class="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-app-inner border border-app-border">
-        <span id="sync-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
-        <span id="sync-text" class="text-[11px] font-mono text-zinc-400">Синхронізація...</span>
+      <!-- Статус хмари -->
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-app-subtle border border-app-cardBorder">
+        <span id="sync-dot" class="w-2 h-2 rounded-full bg-zinc-500"></span>
+        <span id="sync-text" class="text-[11px] font-mono text-zinc-300">Підключення...</span>
       </div>
 
-      <button onclick="openModal()" class="flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-medium text-xs transition duration-200 active:scale-95 shadow-sm">
+      <!-- Кнопка відкриття Калькулятора (Pop-up) -->
+      <button onclick="openModal('calc-modal')" class="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 font-semibold text-xs transition duration-150 active:scale-95">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        <span>Калькулятор ERR / Stories</span>
+      </button>
+
+      <button onclick="openModal('link-modal')" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-bold text-xs transition duration-150 active:scale-95 shadow-sm">
         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-        <span>Додати ресурс</span>
+        <span>Ресурс</span>
       </button>
     </div>
   </header>
 
-  <!-- ОСНОВНА СІТКА НА ВЕСЬ ЕКРАН БЕЗ СКРОЛУ -->
-  <main class="w-full flex-1 grid grid-cols-12 gap-4 min-h-0">
+  <!-- ГОЛОВНИЙ ЕКРАН (1 СТОРІНКА БЕЗ СКРОЛУ) -->
+  <main class="w-full flex-1 grid grid-cols-12 gap-3.5 min-h-0">
 
-    <!-- КОЛОНКА 1: РЕСУРСИ & ДИСКИ (3 КОЛОНКИ) -->
-    <section class="col-span-12 lg:col-span-3 bg-app-card border border-app-border rounded-3xl p-5 flex flex-col justify-between overflow-hidden shadow-2xl shadow-black/40">
-      
-      <div class="flex items-center justify-between mb-3 shrink-0">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
-          </div>
-          <h2 class="text-xs font-bold text-zinc-200 tracking-wider uppercase">Ресурси & Диски</h2>
+    <!-- КОЛОНКА 1: РОБОЧІ РЕСУРСИ (РОЗШИРЕНА З КОМПАКТНИМИ КАРТКАМИ) — 4 КОЛОНКИ -->
+    <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
+      <div class="flex items-center justify-between mb-2.5 shrink-0">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+          <h2 class="text-xs font-bold text-zinc-100 tracking-wider uppercase">Швидкі посилання & Таблиці</h2>
         </div>
-        <span class="text-[10px] font-mono text-zinc-500">Fast Access</span>
+        <span class="text-[10px] font-mono text-zinc-400">Картки</span>
       </div>
 
-      <!-- Список посилань із прихованим скролом -->
-      <div id="links-list" class="flex-1 space-y-2.5 overflow-y-auto pr-1">
-        <!-- Генерується через JS -->
+      <!-- Сітка посилань (у 2 акуратні колонки всередині блоку) -->
+      <div id="links-list" class="flex-1 grid grid-cols-2 gap-2 overflow-y-auto pr-1 content-start">
+        <!-- Картки -->
       </div>
 
-      <div class="pt-3.5 mt-2 border-t border-app-border/70 flex items-center justify-between text-[11px] text-zinc-500 font-mono shrink-0">
-        <span>Google Docs / Sheets</span>
-        <span class="text-indigo-400/80">1-click ↗</span>
+      <div class="pt-2.5 border-t border-app-cardBorder flex items-center justify-between text-[10px] text-zinc-400 font-mono shrink-0">
+        <span>Швидкий перехід у клік</span>
+        <span class="text-indigo-400">Google Workspace</span>
       </div>
     </section>
 
-    <!-- КОЛОНКА 2: КАЛЬКУЛЯТОРИ ERR & STORIES (4 КОЛОНКИ) -->
-    <section class="col-span-12 lg:col-span-4 bg-app-card border border-app-border rounded-3xl p-5 flex flex-col justify-between overflow-hidden shadow-2xl shadow-black/40">
-      
-      <div class="flex items-center justify-between mb-3 shrink-0">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-          </div>
-          <h2 class="text-xs font-bold text-zinc-200 tracking-wider uppercase">Аналітика & Метрики</h2>
+    <!-- КОЛОНКА 2: WORKSECTION ДЕДЛАЙНИ (ЖИВИЙ ІНТЕГРОВАНИЙ КАЛЕНДАР) — 4 КОЛОНКИ -->
+    <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
+      <div class="flex items-center justify-between mb-2.5 shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
+          <h2 class="text-xs font-bold text-zinc-100 tracking-wider uppercase">Worksection Задачі</h2>
         </div>
-        <span class="text-[10px] font-mono text-zinc-500">Auto-calc</span>
+        <button onclick="fetchWorksectionTasks()" class="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+          <span>Оновити</span> ⟳
+        </button>
       </div>
 
-      <div class="flex-1 flex flex-col justify-between gap-3.5 min-h-0">
-
-        <!-- Блок 1: ERR -->
-        <div class="bg-app-inner/60 border border-app-border rounded-2xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-              <span class="text-xs font-semibold text-zinc-200">ERR за охопленням</span>
-            </div>
-            
-            <div class="flex items-center gap-2 bg-app-bg px-2.5 py-1 rounded-xl border border-app-border">
-              <span id="err-result" class="text-sm font-bold font-mono text-indigo-300">0.00%</span>
-              <button onclick="copyOnlyValue('err-result')" class="text-zinc-500 hover:text-white transition" title="Скопіювати число">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="space-y-2.5">
-            <div>
-              <input type="text" id="err-reach" placeholder="Охоплення через пробіл..." class="w-full bg-app-bg border border-app-border rounded-xl px-3.5 py-2 text-xs text-zinc-200 font-mono placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/60 transition">
-            </div>
-            <div>
-              <input type="text" id="err-eng" placeholder="Взаємодії через пробіл..." class="w-full bg-app-bg border border-app-border rounded-xl px-3.5 py-2 text-xs text-zinc-200 font-mono placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/60 transition">
-            </div>
-          </div>
+      <!-- Контейнер задач Worksection -->
+      <div id="ws-tasks-container" class="flex-1 space-y-2 overflow-y-auto pr-1">
+        <div class="p-3 rounded-xl bg-app-subtle/50 text-xs text-zinc-400 text-center animate-pulse">
+          Завантаження задач із Worksection...
         </div>
-
-        <!-- Блок 2: Stories -->
-        <div class="bg-app-inner/60 border border-app-border rounded-2xl p-4 flex flex-col justify-between">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
-              <span class="text-xs font-semibold text-zinc-200">Середні перегляди Stories</span>
-            </div>
-            
-            <div class="flex items-center gap-2 bg-app-bg px-2.5 py-1 rounded-xl border border-app-border">
-              <span id="st-result" class="text-sm font-bold font-mono text-purple-300">0</span>
-              <button onclick="copyOnlyValue('st-result')" class="text-zinc-500 hover:text-white transition" title="Скопіювати число">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <input type="text" id="st-views" placeholder="Перегляди сторіз через пробіл..." class="w-full bg-app-bg border border-app-border rounded-xl px-3.5 py-2 text-xs text-zinc-200 font-mono placeholder:text-zinc-600 focus:outline-none focus:border-purple-500/60 transition">
-          </div>
-        </div>
-
       </div>
 
-      <div class="pt-3.5 mt-2 border-t border-app-border/70 flex items-center justify-between text-[11px] text-zinc-500 font-mono shrink-0">
-        <span>Калькулятор без лімітів</span>
-        <span class="text-purple-400/80">Live calculation</span>
+      <div class="pt-2.5 border-t border-app-cardBorder flex items-center justify-between text-[10px] text-zinc-400 font-mono shrink-0">
+        <span>vau.worksection.com</span>
+        <span class="text-rose-400">Дедлайни</span>
       </div>
     </section>
 
-    <!-- КОЛОНКА 3: ВЕЛИКИЙ ШВИДКИЙ БЛОКНОТ (5 КОЛОНОК) -->
-    <section class="col-span-12 lg:col-span-5 bg-app-card border border-app-border rounded-3xl p-5 flex flex-col justify-between overflow-hidden shadow-2xl shadow-black/40">
+    <!-- КОЛОНКА 3: БЛОКНОТ (SCRATCHPAD) ТА НОТАТКИ — 4 КОЛОНКИ -->
+    <section class="col-span-4 bg-app-card border border-app-cardBorder rounded-2xl p-4 flex flex-col justify-between overflow-hidden shadow-lg shadow-black/15">
       
-      <div class="flex items-center justify-between mb-3 shrink-0">
-        <div class="flex items-center gap-2.5">
-          <div class="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-          </div>
-          <h2 class="text-xs font-bold text-zinc-200 tracking-wider uppercase">Швидкий Блокнот</h2>
+      <div class="flex items-center justify-between mb-2 shrink-0">
+        <div class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          <h2 class="text-xs font-bold text-zinc-100 tracking-wider uppercase">Блокнот & Замітки</h2>
         </div>
-        <span class="text-[10px] font-mono text-zinc-500">Auto-save</span>
+        <span class="text-[10px] font-mono text-zinc-400">Auto-save</span>
       </div>
 
-      <!-- Текстове поле без початкового сміття -->
-      <div class="flex-1 w-full min-h-0 bg-app-inner/60 border border-app-border rounded-2xl p-4 flex flex-col focus-within:border-indigo-500/40 transition">
-        <textarea 
-          id="notepad-area" 
-          oninput="onNoteChange(this.value)" 
-          placeholder="Почніть писати тут (ідеї, пости, копірайт, важливі думки)..." 
-          class="w-full flex-1 bg-transparent text-xs sm:text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none resize-none leading-relaxed font-sans"
-        ></textarea>
+      <div class="flex-1 flex flex-col gap-3 min-h-0">
+        <!-- 1. Велике текстове поле (Word-style швидкий блокнот) -->
+        <div class="h-1/2 bg-app-subtle/50 border border-app-cardBorder rounded-xl p-3 flex flex-col">
+          <textarea 
+            id="scratchpad" 
+            oninput="onPadInput(this.value)" 
+            placeholder="Швидкий текст, копірайт, думки на сьогодні..." 
+            class="w-full flex-1 bg-transparent text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none resize-none leading-relaxed font-sans"
+          ></textarea>
+        </div>
+
+        <!-- 2. Окремі списки нотаток / To-Do -->
+        <div class="h-1/2 bg-app-subtle/30 border border-app-cardBorder rounded-xl p-3 flex flex-col justify-between overflow-hidden">
+          <div class="flex items-center gap-1.5 mb-2 shrink-0">
+            <input type="text" id="new-note-input" placeholder="+ Додати швидку нотатку..." class="flex-1 bg-app-base border border-app-cardBorder rounded-lg px-2.5 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500">
+            <button onclick="addNoteItem()" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition">+</button>
+          </div>
+
+          <div id="notes-list-container" class="flex-1 space-y-1.5 overflow-y-auto pr-1">
+            <!-- Список стікерів-нотаток -->
+          </div>
+        </div>
       </div>
 
-      <div class="pt-3.5 mt-2 border-t border-app-border/70 flex items-center justify-between text-[11px] text-zinc-500 font-mono shrink-0">
+      <div class="pt-2.5 border-t border-app-cardBorder flex items-center justify-between text-[10px] text-zinc-400 font-mono shrink-0">
         <span>Хмарна синхронізація</span>
-        <span class="text-blue-400/80">Word pad</span>
+        <span class="text-sky-400">Notes & Pad</span>
       </div>
     </section>
 
   </main>
 
-  <!-- МОДАЛЬНЕ ВІКНО ДОДАВАННЯ РЕСУРСУ -->
-  <div id="modal-box" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-app-card border border-app-border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between pb-3 border-b border-app-border">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Додати посилання</h3>
-        <button onclick="closeModal()" class="text-zinc-500 hover:text-white">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-        </button>
+  <!-- ================= POP-UP 1: КАЛЬКУЛЯТОР ERR ТА STORIES ================= -->
+  <div id="calc-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-app-card border border-app-cardBorder rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-app-cardBorder">
+        <div class="flex items-center gap-2.5">
+          <div class="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          </div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-white">Калькулятор SMM (ERR & Stories)</h3>
+        </div>
+        <button onclick="closeModal('calc-modal')" class="text-zinc-400 hover:text-white text-lg">✕</button>
       </div>
 
+      <div class="space-y-4">
+        <!-- Блок ERR -->
+        <div class="p-4 rounded-2xl bg-app-subtle border border-app-cardBorder space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-200">ERR за охопленням</span>
+            <div class="flex items-center gap-2 bg-app-base px-3 py-1 rounded-xl border border-app-cardBorder">
+              <span id="pop-err-result" class="text-sm font-bold font-mono text-indigo-300">0.00%</span>
+              <button onclick="copyOnly('pop-err-result')" class="text-zinc-400 hover:text-white" title="Скопіювати число">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
+            </div>
+          </div>
+          <input type="text" id="pop-err-reach" placeholder="Охоплення через пробіл..." class="w-full bg-app-base border border-app-cardBorder rounded-xl px-3.5 py-2 text-xs text-zinc-100 font-mono placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500">
+          <input type="text" id="pop-err-eng" placeholder="Взаємодії через пробіл..." class="w-full bg-app-base border border-app-cardBorder rounded-xl px-3.5 py-2 text-xs text-zinc-100 font-mono placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <!-- Блок Stories -->
+        <div class="p-4 rounded-2xl bg-app-subtle border border-app-cardBorder space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-zinc-200">Середні перегляди Stories</span>
+            <div class="flex items-center gap-2 bg-app-base px-3 py-1 rounded-xl border border-app-cardBorder">
+              <span id="pop-st-result" class="text-sm font-bold font-mono text-sky-300">0</span>
+              <button onclick="copyOnly('pop-st-result')" class="text-zinc-400 hover:text-white" title="Скопіювати число">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
+            </div>
+          </div>
+          <input type="text" id="pop-st-views" placeholder="Перегляди сторіз через пробіл..." class="w-full bg-app-base border border-app-cardBorder rounded-xl px-3.5 py-2 text-xs text-zinc-100 font-mono placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500">
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal('calc-modal')" class="px-5 py-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition">Закрити</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= POP-UP 2: ДОДАВАННЯ РЕСУРСУ ================= -->
+  <div id="link-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-app-card border border-app-cardBorder rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-3 border-b border-app-cardBorder">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-white">Нове посилання</h3>
+        <button onclick="closeModal('link-modal')" class="text-zinc-400 hover:text-white">✕</button>
+      </div>
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-[10px] text-zinc-500 font-mono mb-1">НАЗВА КАРТКИ</label>
-          <input type="text" id="modal-title" placeholder="Таблиця звітів" class="w-full bg-app-inner border border-app-border rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">НАЗВА КАРТКИ</label>
+          <input type="text" id="modal-title" placeholder="Таблиця звітів" class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="block text-[10px] text-zinc-500 font-mono mb-1">КАТЕГОРІЯ</label>
-          <input type="text" id="modal-cat" placeholder="Аналітика / Клієнт" class="w-full bg-app-inner border border-app-border rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">КАТЕГОРІЯ</label>
+          <input type="text" id="modal-cat" placeholder="Аналітика / Клієнт" class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="block text-[10px] text-zinc-500 font-mono mb-1">ТИП ІКОНКИ</label>
-          <select id="modal-type" class="w-full bg-app-inner border border-app-border rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">ТИП</label>
+          <select id="modal-type" class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
             <option value="sheet">Таблиця (Sheets)</option>
-            <option value="drive">Папка / Диск (Drive)</option>
+            <option value="drive">Диск / Папка (Drive)</option>
             <option value="link">Посилання (Веб-сайт)</option>
           </select>
         </div>
         <div>
-          <label class="block text-[10px] text-zinc-500 font-mono mb-1">URL ПОСИЛАННЯ</label>
-          <input type="url" id="modal-url" placeholder="https://docs.google.com/..." class="w-full bg-app-inner border border-app-border rounded-xl px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500">
+          <label class="block text-[10px] text-zinc-400 font-mono mb-1">URL</label>
+          <input type="url" id="modal-url" placeholder="https://..." class="w-full bg-app-subtle border border-app-cardBorder rounded-xl px-3 py-2 text-zinc-100 focus:outline-none focus:border-indigo-500">
         </div>
       </div>
-
-      <div class="flex justify-end gap-2.5 pt-2">
-        <button onclick="closeModal()" class="px-4 py-2 text-xs text-zinc-400 hover:text-white">Скасувати</button>
-        <button onclick="saveNewLink()" class="px-4 py-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition">Зберегти</button>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('link-modal')" class="px-4 py-2 text-xs text-zinc-400 hover:text-white">Скасувати</button>
+        <button onclick="saveNewLink()" class="px-4 py-2 text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl">Зберегти</button>
       </div>
     </div>
   </div>
@@ -414,54 +445,120 @@
     const now = new Date();
     document.getElementById('cur-date').textContent = new Intl.DateTimeFormat('uk-UA', { weekday: 'short', day: 'numeric', month: 'short' }).format(now);
 
-    function openModal() { document.getElementById('modal-box').classList.remove('hidden'); }
-    function closeModal() {
-      document.getElementById('modal-box').classList.add('hidden');
-      document.getElementById('modal-title').value = '';
-      document.getElementById('modal-cat').value = '';
-      document.getElementById('modal-url').value = '';
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+    // --- WORKSECTION LIVE CALENDAR FETCH ---
+    const WS_FEED_URL = "https://vau.worksection.com/calendar/xml/30bdfde15338d0af5c24b783698cd2fb/?v=2&role=1";
+
+    async function fetchWorksectionTasks() {
+      const container = document.getElementById('ws-tasks-container');
+      container.innerHTML = `<div class="p-3 rounded-xl bg-app-subtle/50 text-xs text-zinc-400 text-center animate-pulse">Оновлення задач...</div>`;
+
+      try {
+        // Використовуємо надійний CORS-проксі allorigins для завантаження iCal стрічки
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(WS_FEED_URL)}`;
+        const res = await fetch(proxyUrl);
+        const data = await res.text();
+        parseIcalData(data);
+      } catch (e) {
+        container.innerHTML = `
+          <div class="p-3 rounded-xl bg-app-subtle/60 border border-app-cardBorder text-xs text-zinc-300 text-center space-y-2">
+            <p>Не вдалося завантажити фід напряму через обмеження браузера.</p>
+            <a href="https://vau.worksection.com" target="_blank" class="inline-block px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold">Відкрити Worksection ↗</a>
+          </div>
+        `;
+      }
     }
 
-    // Парсер чисел без обмежень
-    function extractNumbers(str) {
+    function parseIcalData(rawIcal) {
+      const container = document.getElementById('ws-tasks-container');
+      const events = [];
+      const lines = rawIcal.split(/\r?\n/);
+      let inEvent = false;
+      let cur = {};
+
+      lines.forEach(line => {
+        if (line.startsWith('BEGIN:VEVENT')) { inEvent = true; cur = {}; }
+        else if (line.startsWith('END:VEVENT')) { inEvent = false; events.push(cur); }
+        else if (inEvent) {
+          if (line.startsWith('SUMMARY:')) cur.title = line.replace('SUMMARY:', '').trim();
+          if (line.startsWith('DTSTART') || line.startsWith('DTEND')) {
+            const parts = line.split(':');
+            cur.date = parts[1] ? parts[1].trim() : '';
+          }
+          if (line.startsWith('URL:')) cur.url = line.replace('URL:', '').trim();
+        }
+      });
+
+      if (events.length === 0) {
+        container.innerHTML = `<div class="p-3 rounded-xl bg-app-subtle/40 text-xs text-zinc-400 text-center">Активних дедлайнів на найближчий час немає 🎉</div>`;
+        return;
+      }
+
+      container.innerHTML = '';
+      events.slice(0, 10).forEach(ev => {
+        let fmtDate = "Скоро";
+        if (ev.date && ev.date.length >= 8) {
+          const y = ev.date.substring(0, 4);
+          const m = ev.date.substring(4, 6);
+          const d = ev.date.substring(6, 8);
+          fmtDate = `${d}.${m}`;
+        }
+
+        const taskEl = document.createElement('div');
+        taskEl.className = "p-2.5 rounded-xl bg-app-subtle/45 hover:bg-app-subtle/80 border border-app-cardBorder flex items-center justify-between gap-3 transition";
+        taskEl.innerHTML = `
+          <div class="min-w-0 pr-1">
+            <span class="text-xs font-medium text-zinc-100 block truncate">${ev.title || 'Задача без назви'}</span>
+            <span class="text-[10px] text-zinc-400 font-mono">Дедлайн: ${fmtDate}</span>
+          </div>
+          ${ev.url ? `<a href="${ev.url}" target="_blank" class="p-1 rounded-lg text-indigo-400 hover:text-white text-[11px] font-mono">↗</a>` : ''}
+        `;
+        container.appendChild(taskEl);
+      });
+    }
+
+    // Завантажуємо задачі при запуску
+    fetchWorksectionTasks();
+
+    // --- ЛОГІКА КАЛЬКУЛЯТОРА В ПОП-АПІ ---
+    function extractNums(str) {
       if (!str) return [];
       return str.match(/\d+(\.\d+)?/g)?.map(Number) || [];
     }
 
-    function calculate() {
-      // 1. ERR
-      const reachArr = extractNumbers(document.getElementById('err-reach').value);
-      const engArr = extractNumbers(document.getElementById('err-eng').value);
-
+    function calcPopMetrics() {
+      // ERR
+      const reachArr = extractNums(document.getElementById('pop-err-reach').value);
+      const engArr = extractNums(document.getElementById('pop-err-eng').value);
       const totalReach = reachArr.reduce((a, b) => a + b, 0);
       const totalEng = engArr.reduce((a, b) => a + b, 0);
 
-      const errEl = document.getElementById('err-result');
+      const errEl = document.getElementById('pop-err-result');
       if (totalReach > 0) {
         errEl.textContent = ((totalEng / totalReach) * 100).toFixed(2) + '%';
       } else {
         errEl.textContent = '0.00%';
       }
 
-      // 2. Stories
-      const stArr = extractNumbers(document.getElementById('st-views').value);
-      const stEl = document.getElementById('st-result');
+      // Stories
+      const stArr = extractNums(document.getElementById('pop-st-views').value);
+      const stEl = document.getElementById('pop-st-result');
       if (stArr.length > 0) {
-        const avg = Math.round(stArr.reduce((a, b) => a + b, 0) / stArr.length);
-        stEl.textContent = avg.toLocaleString();
+        stEl.textContent = Math.round(stArr.reduce((a, b) => a + b, 0) / stArr.length).toLocaleString();
       } else {
         stEl.textContent = '0';
       }
     }
 
-    document.getElementById('err-reach').addEventListener('input', calculate);
-    document.getElementById('err-eng').addEventListener('input', calculate);
-    document.getElementById('st-views').addEventListener('input', calculate);
+    document.getElementById('pop-err-reach').addEventListener('input', calcPopMetrics);
+    document.getElementById('pop-err-eng').addEventListener('input', calcPopMetrics);
+    document.getElementById('pop-st-views').addEventListener('input', calcPopMetrics);
 
-    // Копіювання суто значення
-    function copyOnlyValue(id) {
-      const text = document.getElementById(id).textContent;
-      navigator.clipboard.writeText(text).then(() => {
+    function copyOnly(id) {
+      const val = document.getElementById(id).textContent;
+      navigator.clipboard.writeText(val).then(() => {
         const el = document.getElementById(id);
         const prev = el.textContent;
         el.textContent = 'Copied!';
